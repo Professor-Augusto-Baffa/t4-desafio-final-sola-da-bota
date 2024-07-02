@@ -40,10 +40,15 @@ class GameAI():
 
     memory = []
     gold = []
+    potion = []
     recent_pit = []
 
     dying = False # If energy < 40
     dodge = False # If is trying to dodge bullets
+    alone = False # If is alone in the map
+    
+    on_gold = False # If is on gold
+    on_potion = False # If is on potion
 
     # 1 significa encontrar e pegar pelo menos uma pocao azul
     # 2 significa tentar matar todos os jogadores
@@ -72,7 +77,6 @@ class GameAI():
         self.score = score
         self.energy = energy
 
-
     # <summary>
     # Get list of observable adjacent positions
     # </summary>
@@ -91,35 +95,35 @@ class GameAI():
 
         return ret
 
-
-    # <summary>
-    # Get list of all adjacent positions (including diagonal)
-    # </summary>
-    # <returns>List of all adjacent positions (including diagonal)</returns>
-    def GetAllAdjacentPositions(self):
-    
+    # Posições válidas em uma distância de 2 de manhattan
+    def  manhattan2(position):
         ret = []
 
-        if (self.player.y > 0):
-            if (self.player.x > 0):
-                ret.append(Position(self.player.x - 1, self.player.y - 1))
-            ret.append(Position(self.player.x, self.player.y - 1))
-            if (self.player.x < MAX_X):
-                ret.append(Position(self.player.x + 1, self.player.y - 1))
-
-        if (self.player.x > 0):
-            if (self.plsyer.y < MAX_Y):
-                ret.append(Position(self.player.x - 1, self.player.y + 1))
-            ret.append(Position(self.player.x - 1, self.player.y))
-
-        if (self.player.x < MAX_X):
-            ret.append(Position(self.player.x + 1, self.player.y))
-            if (self.player.y < MAX_Y):
-                ret.append(Position(self.player.x + 1, self.player.y + 1))
-                
-        if (self.player.y < MAX_Y):
-            ret.append(Position(self.player.x, self.player.y + 1))
-
+        if (position.x > 0):
+            ret.append(Position(position.x - 1, position.y))
+            if (position.x > 1):
+                ret.append(Position(position.x - 2, position.y))
+        if (position.x < MAX_X):
+            ret.append(Position(position.x + 1, position.y))
+            if (position.x < MAX_X - 1):
+                ret.append(Position(position.x + 2, position.y))
+        if (position.y > 0):
+            ret.append(Position(position.x, position.y - 1))
+            if (position.y > 1):
+                ret.append(Position(position.x, position.y - 2))
+        if (position.y < MAX_Y):
+            ret.append(Position(position.x, position.y + 1))
+            if (position.y < MAX_Y - 1):
+                ret.append(Position(position.x, position.y + 2))
+        if (position.x > 0 and position.y > 0):
+            ret.append(Position(position.x - 1, position.y - 1))
+        if (position.x < MAX_X and position.y > 0):
+            ret.append(Position(position.x + 1, position.y - 1))
+        if (position.x > 0 and position.y < MAX_Y):
+            ret.append(Position(position.x - 1, position.y + 1))
+        if (position.x < MAX_X and position.y < MAX_Y):
+            ret.append(Position(position.x + 1, position.y + 1))
+        
         return ret
     
 
@@ -178,9 +182,16 @@ class GameAI():
         # coordenadas atuais do player
 
 
+        adjacentes = self.GetObservableAdjacentPositions()
+
+        # Se não houver observações, marcar todas as as adjacências que estavam como perigo como seguras
         if (o == None or len(o) == 0):
-            for adj in self.GetObservableAdjacentPositions(self):
-                self.memory[adj.y][adj.x].safe = True
+            for adj in adjacentes:
+                pos_mem = self.memory[adj.y][adj.x]
+                if (pos_mem.safe == False):
+                    pos_mem.safe = True
+                    pos_mem.content = []
+
             return
         
         for s in o:
@@ -207,17 +218,62 @@ class GameAI():
                             self.memory[self.player.y][self.player.x - 1].blocked = True
                         elif (self.prev_action == "andar_re"):
                             self.memory[self.player.y][self.player.x + 1].blocked = True
-            
+                pass
+
             elif s == "steps":
                 pass
             
             elif s == "breeze":
+                unsafe = []
+                for adj in adjacentes:
+                    pos_mem = self.memory[adj.y][adj.x]
+                    if (pos_mem.safe == False):
+                        unsafe.append(adj)
+                if (len(unsafe) == 1):
+                    self.memory[unsafe[0].y][unsafe[0].x].content = ["pit"]
+                    around = self.manhattan2(unsafe[0])
+                    for a in around:
+                        pos_mem = self.memory[a.y][a.x]
+                        if ("pit" in pos_mem.content):
+                            pos_mem.content.remove("pit")
+                else:
+                    for adj in unsafe:
+                        pos_mem = self.memory[adj.y][adj.x]
+                        if ("pit" not in pos_mem.content):
+                            pos_mem.content.append("pit")
+
                 pass
 
             elif s == "flash":
+                unsafe = []
+                for adj in adjacentes:
+                    pos_mem = self.memory[adj.y][adj.x]
+                    if (pos_mem.safe == False):
+                        unsafe.append(adj)
+                if (len(unsafe) == 1):
+                    self.memory[unsafe[0].y][unsafe[0].x].content = ["teleport"]
+                    around = self.manhattan2(unsafe[0])
+                    for a in around:
+                        pos_mem = self.memory[a.y][a.x]
+                        if ("teleport" in pos_mem.content):
+                            pos_mem.content.remove("teleport")
+                else:
+                    for adj in unsafe:
+                        pos_mem = self.memory[adj.y][adj.x]
+                        if ("teleport" not in pos_mem.content):
+                            pos_mem.content.append("teleport")
                 pass
 
             elif s == "blueLight":
+                pos_mem = self.memory[self.player.y][self.player.x]
+                pos_mem.timer = 0
+
+                if "potion" not in pos_mem.content:
+                    self.potion.append(pos_mem)
+                    pos_mem.content = ["potion"]
+
+                self.on_potion = True
+
                 pass
 
             elif s == "redLight":
@@ -226,7 +282,11 @@ class GameAI():
 
                 if "gold" not in pos_mem.content:
                     self.gold.append(pos_mem)
-                    pos_mem.content.append("gold")
+                    pos_mem.content = ["gold"]
+                
+                self.on_gold = True
+
+                pass
 
             elif "damage" in s:
                 attacker = s[7:]
@@ -250,8 +310,36 @@ class GameAI():
         # como "apagar/esquecer" as observacoes?
         # devemos apagar as atuais para poder receber novas
         # se nao apagarmos, as novas se misturam com as anteriores
+
+        self.update_clock()
+
         pass
     
+    # Diminui 1 de cada timer > 0 
+    def update_clock(self):
+        for pos in self.potion:
+            if (pos.timer > 0):
+                pos.timer -= 1
+        for pos in self.gold:
+            if (pos.timer > 0):
+                pos.timer -= 1
+
+    # Define a posição da poção mais próxima levando em consideração heurística e timer
+    # Retorna None se não conhece poções
+    def closest_potion(self):
+        min_time = 999
+        closest = None
+
+        for mem_pos in self.potion:
+            time = mem_pos.timer
+            disc = Heuristic(self.player, self.dir, mem_pos.position)
+            if (disc > time):
+                time = disc
+            if (time < min_time):
+                min_time = time
+                closest = mem_pos
+
+        return closest
 
     # <summary>
     # Get Decision
@@ -271,7 +359,27 @@ class GameAI():
         # 4- envia decisão ao servidor
         # 5- após ação enviada, reinicia voltando ao passo 1
         
-        adjacentes = self.GetObservableAdjacentPositions(self)
+        if (self.energy == 0):
+            return ""
+        
+        # Se passar por cima do ouro, sempre pegar
+        if (self.on_gold):
+            self.on_gold = False
+            self.prev_action = "pegar_ouro"
+            return "pegar_ouro"
+        
+        if (self.on_potion and not self.alone and self.energy < 100):
+            self.on_potion = False
+            self.memory[self.player.y][self.player.x].timer = 300
+            self.prev_action = "pegar_powerup"
+            return "pegar_powerup"
+
+        if (self.energy < 40 and not self.dying):
+            self.dying = True
+            
+            
+
+        adjacentes = self.GetObservableAdjacentPositions()
         safeAdjs = []
         for adj in adjacentes:
             if (self.memory[adj.y][adj.x].safe):
@@ -296,7 +404,9 @@ class GameAI():
             self.prev_action = "andar_re"
             return "andar_re"
 
-        
+        if (len(safeAdjs) == 1):
+            #IMPLEMENTAR ANDA PRA ELE
+            pass
 
 
         # Exemplo de decisão aleatória:
@@ -328,7 +438,7 @@ def InstantiateMemory():
         listax = []
 
         for j in range(MAX_X):
-            listax.append(MemoryPosition(j, i))
+            listax.append(MemoryPosition(Position(j, i)))
         
         listay.append(listax)
     
