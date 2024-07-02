@@ -33,7 +33,7 @@ class Bot():
 
     #Descomente para escolher uma cor
     #botcolor = (255,0,0)  # BOT COLOR
-    name = "INF1771 Bot Example1" # BOT NAME
+    name = "BOTe" # BOT NAME
     host = "atari.icad.puc-rio.br" # SERVER
 
     client = None
@@ -256,7 +256,7 @@ class Bot():
                 elif cmd[0] == "h":
                     if len(cmd) > 1:
                         o = []
-                        o.append("hit")
+                        o.append("hit," + cmd[1])
                         self.gameAi.GetObservations(o)
                         self.msg.append("you hit " + cmd[1])                    
                     
@@ -265,7 +265,7 @@ class Bot():
                 elif cmd[0] == "d":
                     if len(cmd) > 1:
                         o = []
-                        o.append("damage")
+                        o.append("damage," + cmd[1])
                         self.gameAi.GetObservations(o)
                         self.msg.append(cmd[1] + " hit you")                    
                     

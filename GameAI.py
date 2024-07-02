@@ -21,6 +21,9 @@ __email__ = "abaffa@inf.puc-rio.br"
 import random
 from Map.Position import Position
 
+MAX_Y = 34
+MAX_X = 59
+
 # <summary>
 # Game AI Example
 # </summary>
@@ -31,6 +34,24 @@ class GameAI():
     dir = "north"
     score = 0
     energy = 0
+
+    prev_action = None
+    destination = None
+
+    memory = []
+    gold = []
+    recent_pit = []
+
+    dying = False # If energy < 40
+    dodge = False # If is trying to dodge bullets
+
+    # 1 significa encontrar e pegar pelo menos uma pocao azul
+    # 2 significa tentar matar todos os jogadores
+    # 3 significa pegar o maximo de ouros possivel
+    stage = 1
+
+    def __init__(self):
+        self.memory = InstantiateMemory()
 
     # <summary>
     # Refresh player status
@@ -58,11 +79,15 @@ class GameAI():
     # <returns>List of observable adjacent positions</returns>
     def GetObservableAdjacentPositions(self):
         ret = []
-
-        ret.append(Position(self.player.x - 1, self.player.y))
-        ret.append(Position(self.player.x + 1, self.player.y))
-        ret.append(Position(self.player.x, self.player.y - 1))
-        ret.append(Position(self.player.x, self.player.y + 1))
+        
+        if (self.player.y > 0):
+            ret.append(Position(self.player.x, self.player.y - 1))
+        if (self.player.x < MAX_X):
+            ret.append(Position(self.player.x + 1, self.player.y))
+        if (self.player.y < MAX_Y):
+            ret.append(Position(self.player.x, self.player.y + 1))
+        if (self.player.x > 0):
+            ret.append(Position(self.player.x - 1, self.player.y))
 
         return ret
 
@@ -75,16 +100,25 @@ class GameAI():
     
         ret = []
 
-        ret.Add(Position(self.player.x - 1, self.player.y - 1))
-        ret.Add(Position(self.player.x, self.player.y - 1))
-        ret.Add(Position(self.player.x + 1, self.player.y - 1))
+        if (self.player.y > 0):
+            if (self.player.x > 0):
+                ret.append(Position(self.player.x - 1, self.player.y - 1))
+            ret.append(Position(self.player.x, self.player.y - 1))
+            if (self.player.x < MAX_X):
+                ret.append(Position(self.player.x + 1, self.player.y - 1))
 
-        ret.Add(Position(self.player.x - 1, self.player.y))
-        ret.Add(Position(self.player.x + 1, self.player.y))
+        if (self.player.x > 0):
+            if (self.plsyer.y < MAX_Y):
+                ret.append(Position(self.player.x - 1, self.player.y + 1))
+            ret.append(Position(self.player.x - 1, self.player.y))
 
-        ret.Add(Position(self.player.x - 1, self.player.y + 1))
-        ret.Add(Position(self.player.x, self.player.y + 1))
-        ret.Add(Position(self.player.x + 1, self.player.y + 1))
+        if (self.player.x < MAX_X):
+            ret.append(Position(self.player.x + 1, self.player.y))
+            if (self.player.y < MAX_Y):
+                ret.append(Position(self.player.x + 1, self.player.y + 1))
+                
+        if (self.player.y < MAX_Y):
+            ret.append(Position(self.player.x, self.player.y + 1))
 
         return ret
     
@@ -142,11 +176,37 @@ class GameAI():
         # como seu bot vai memorizar os lugares por onde passou?
         # aqui, recebe-se as observacoes dos sensores para as
         # coordenadas atuais do player
+
+
+        if (o == None or len(o) == 0):
+            for adj in self.GetObservableAdjacentPositions(self):
+                self.memory[adj.y][adj.x].safe = True
+            return
         
         for s in o:
         
             if s == "blocked":
-                pass
+                match (self.dir):
+                    case "north":
+                        if (self.prev_action == "andar"):
+                            self.memory[self.player.y - 1][self.player.x].blocked = True
+                        elif (self.prev_action == "andar_re"):
+                            self.memory[self.player.y + 1][self.player.x].blocked = True
+                    case "east":
+                        if (self.prev_action == "andar"):
+                            self.memory[self.player.y][self.player.x + 1].blocked = True
+                        elif (self.prev_action == "andar_re"):
+                            self.memory[self.player.y][self.player.x - 1].blocked = True
+                    case "south":
+                        if (self.prev_action == "andar"):
+                            self.memory[self.player.y + 1][self.player.x].blocked = True
+                        elif (self.prev_action == "andar_re"):
+                            self.memory[self.player.y - 1][self.player.x].blocked = True
+                    case "west":
+                        if (self.prev_action == "andar"):
+                            self.memory[self.player.y][self.player.x - 1].blocked = True
+                        elif (self.prev_action == "andar_re"):
+                            self.memory[self.player.y][self.player.x + 1].blocked = True
             
             elif s == "steps":
                 pass
@@ -161,19 +221,18 @@ class GameAI():
                 pass
 
             elif s == "redLight":
-                pass
+                pos_mem = self.memory[self.player.y][self.player.x]
+                pos_mem.timer = 300
 
-            elif s == "greenLight":
-                pass
+                if "gold" not in pos_mem.content:
+                    self.gold.append(pos_mem)
+                    pos_mem.content.append("gold")
 
-            elif s == "weakLight":
-                pass
+            elif "damage" in s:
+                attacker = s[7:]
 
-            elif s == "damage":
-                pass
-
-            elif s == "hit":
-                pass
+            elif "hit" in s:
+                hit = s[4:]
             
             elif s.find("enemy#") > -1:
                 try:
@@ -212,6 +271,34 @@ class GameAI():
         # 4- envia decisão ao servidor
         # 5- após ação enviada, reinicia voltando ao passo 1
         
+        adjacentes = self.GetObservableAdjacentPositions(self)
+        safeAdjs = []
+        for adj in adjacentes:
+            if (self.memory[adj.y][adj.x].safe):
+                safeAdjs.append(adj)
+
+        # Se nenhuma adjacência é segura, andar pra frente pois consome menos que virar
+        # Se não for possível andar para frente (borda do mapa ou bloqueio), andar para trás
+        if(safeAdjs == []):
+            self.prev_action = "andar"
+            if (self.dir == "north"):
+                if (self.player.y > 0 and not self.memory[self.player.y - 1][self.player.x].blocked):
+                    return "andar"
+            if (self.dir == "east"):
+                if (self.player.x < MAX_X and not self.memory[self.player.y][self.player.x + 1].blocked):
+                    return "andar"
+            if (self.dir == "south"):
+                if (self.player.y < MAX_Y and not self.memory[self.player.y + 1][self.player.x].blocked):
+                    return "andar"
+            if (self.dir == "west"):
+                if (self.player.x > 0 and not self.memory[self.player.y][self.player.x - 1].blocked):
+                    return "andar"
+            self.prev_action = "andar_re"
+            return "andar_re"
+
+        
+
+
         # Exemplo de decisão aleatória:
         n = random.randint(0,7)
 
@@ -234,3 +321,109 @@ class GameAI():
 
         return ""
 
+def InstantiateMemory():
+    listay = []
+
+    for i in range(MAX_Y):
+        listax = []
+
+        for j in range(MAX_X):
+            listax.append(MemoryPosition(j, i))
+        
+        listay.append(listax)
+    
+    return listay    
+
+class MemoryPosition():
+    def __init__(self, position):
+        self.position = position
+        self.content = []
+        self.visited = False
+        self.safe = False
+        self.blocked = False
+        self.timer = -1
+
+class AStarCoord():
+    def __init__(self, position, dir, destination, stepped, father):
+        self.position = position
+        self.dir = dir
+        self.destination = destination
+        self.stepped = stepped
+        self.heuristic = Heuristic(position, destination)
+        self.adjust = self.heuristic - abs(destination.x - position.x) + abs(destination.y - position.y)
+        self.father = father
+        self.children = []
+
+def CheckNeigbours(father, can_visit, visited):
+    CheckNeigbour(father, can_visit, visited, father.x + 1, father.y)
+    CheckNeigbour(father, can_visit, visited, father.x - 1, father.y)
+    CheckNeigbour(father, can_visit, visited, father.x, father.y + 1)
+    CheckNeigbour(father, can_visit, visited, father.x, father.y - 1)
+
+# Função que avalia se um vizinho já foi percorido e se é válido antes de adicioná-lo como filho de uma outra célula
+def CheckNeigbour(father, can_visit, visited, x, y):
+    if ((x, y) in can_visit and (x, y) not in visited):
+        father.children.append(AStarCoord(x, y, father.destination, father.stepped + father.adjust+ 1, father))
+        visited.append((x, y))
+
+def Heuristic(position, dir, destination):
+    if (dir == "north"):
+        if (position.x == destination.x and position.y > destination.y):
+            adjust = 0
+        elif (position.y >= destination.y):
+            adjust = 1
+        else:
+            adjust = 2
+    elif (dir == "east"):
+        if (position.x < destination.x and position.y == destination.y):
+            adjust = 0
+        elif (position.x <= destination.x):
+            adjust = 1
+        else:
+            adjust = 2
+    elif (dir == "south"):
+        if (position.x == destination.x and position.y < destination.y):
+            adjust = 0
+        elif (position.y <= destination.y):
+            adjust = 1
+        else:
+            adjust = 2
+    elif (dir == "west"):
+        if (position.x > destination.x and position.y == destination.y):
+            adjust = 0
+        elif (position.x >= destination.x):
+            adjust = 1
+        else:
+            adjust = 2
+    else:
+        return
+    
+    return abs(destination.x - position.x) + abs(destination.y - position.y) + adjust
+
+def FindPath(coord):
+    path = [(coord.position.x, coord.position.y)]
+
+    while (coord.father != None):
+        coord = coord.father
+        path.insert(0, (coord.position.x, coord.position.y))
+
+    return path
+
+def AStar(position, dir, can_visit, destination):
+    visited = [(position.x, position.y)]
+    
+    a_star_heap = [AStarCoord(position, dir, destination, 0, None)]
+
+    while (True):
+        current_coord = a_star_heap.pop(0)
+
+        if (current_coord.heuristic == 0):
+            path = FindPath(current_coord)
+
+            return path
+
+        CheckNeigbours(current_coord, can_visit, visited)
+
+        a_star_heap.extend(current_coord.children)
+
+        a_star_heap.sort(key = lambda x : x.stepped + x.heuristic)
