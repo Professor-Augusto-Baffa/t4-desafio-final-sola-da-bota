@@ -32,7 +32,7 @@ import datetime
 class Bot():
 
     #Descomente para escolher uma cor
-    #botcolor = (255,0,0)  # BOT COLOR
+    botcolor = (0,255,255)  # BOT COLOR
     name = "BOTe" # BOT NAME
     host = "atari.icad.puc-rio.br" # SERVER
 
@@ -41,7 +41,7 @@ class Bot():
     timer1 = None
     
     running = True
-    thread_interval = 1 # USE BETWEEN 0.1 and 1 (0.1 real setting, 1 debug settings and makes the bot slower)
+    thread_interval = 0.1 # USE BETWEEN 0.1 and 1 (0.1 real setting, 1 debug settings and makes the bot slower)
 
     playerList = {} #new Dictionary<long, PlayerInfo>
     shotList = [] #new List<ShotInfo>
@@ -62,7 +62,6 @@ class Bot():
 
         self.client = HandleClient()
         self.gameAi = GameAI()
-
         # duration is in seconds
         self.timer1 = Timer(self.thread_interval, self.timer1_Tick)
 
@@ -99,6 +98,7 @@ class Bot():
                     if len(cmd) > 1:
                     
                         if cmd[1].strip() == "":
+                            self.gameAi.GetObservations([])
                             self.gameAi.GetObservationsClean()
 
                         else:
@@ -315,6 +315,7 @@ class Bot():
         elif decision ==  "andar_re":
             self.client.sendBackward()
 
+        self.gameAi.UpdateTimeLeft()
         self.client.sendRequestUserStatus()
         self.client.sendRequestObservation()
 

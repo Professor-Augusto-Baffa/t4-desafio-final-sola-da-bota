@@ -1,0 +1,17 @@
+# Query: move_in_path
+# ContextLines: 1
+
+3 results - 1 file
+
+GameAI.py:
+  367      # Se andar, remove a posição do path
+  368:     def MoveInPath(self):
+  369          prox_pos = self.path[0]
+
+  571                  self.path = AStar(self.player, self.dir, self.destination, self.memory)
+  572:                 return self.MoveInPath()
+  573              
+
+  575              if (self.destination != None):
+  576:                 return self.MoveInPath()
+  577  

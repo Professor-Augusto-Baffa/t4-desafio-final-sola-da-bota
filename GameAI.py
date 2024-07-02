@@ -34,26 +34,29 @@ class GameAI():
     dir = "north"
     score = 0
     energy = 0
+    time_left = 3000
+
+    server_scoreboard = None
 
     prev_action = None
     destination = None
+    path = []
 
     memory = []
     gold = []
     potion = []
-    recent_pit = []
+    dest_pile = []
 
     dying = False # If energy < 40
     dodge = False # If is trying to dodge bullets
-    alone = False # If is alone in the map
+    alone = False # If is alone in the map IMPLEMENTAR
+    saw_enemy = False # If saw enemy IMPLEMENTAR
+    took_damage = False # If took damage
+    enemy_blocked = False
+    blocked = False # If was blocked on the last move
     
     on_gold = False # If is on gold
     on_potion = False # If is on potion
-
-    # 1 significa encontrar e pegar pelo menos uma pocao azul
-    # 2 significa tentar matar todos os jogadores
-    # 3 significa pegar o maximo de ouros possivel
-    stage = 1
 
     def __init__(self):
         self.memory = InstantiateMemory()
@@ -86,9 +89,9 @@ class GameAI():
         
         if (self.player.y > 0):
             ret.append(Position(self.player.x, self.player.y - 1))
-        if (self.player.x < MAX_X):
+        if (self.player.x < MAX_X - 1):
             ret.append(Position(self.player.x + 1, self.player.y))
-        if (self.player.y < MAX_Y):
+        if (self.player.y < MAX_Y - 1):
             ret.append(Position(self.player.x, self.player.y + 1))
         if (self.player.x > 0):
             ret.append(Position(self.player.x - 1, self.player.y))
@@ -96,7 +99,7 @@ class GameAI():
         return ret
 
     # Posições válidas em uma distância de 2 de manhattan
-    def  manhattan2(position):
+    def Manhattan2(position):
         ret = []
 
         if (position.x > 0):
@@ -149,6 +152,23 @@ class GameAI():
 
         return ret
     
+    def NextPositionBack(self):
+    
+        ret = None
+        
+        if self.dir == "south":
+            ret = Position(self.player.x, self.player.y - 1)
+                
+        elif self.dir == "west":
+                ret = Position(self.player.x + 1, self.player.y)
+                
+        elif self.dir == "north":
+                ret = Position(self.player.x, self.player.y + 1)
+                
+        elif self.dir == "east":
+                ret = Position(self.player.x - 1, self.player.y)
+
+        return ret
 
     # <summary>
     # Player position
@@ -168,7 +188,6 @@ class GameAI():
         self.player.y = y
 
     
-
     # <summary>
     # Observations received
     # </summary>
@@ -181,18 +200,18 @@ class GameAI():
         # aqui, recebe-se as observacoes dos sensores para as
         # coordenadas atuais do player
 
+        self.on_potion = False
 
         adjacentes = self.GetObservableAdjacentPositions()
-
-        # Se não houver observações, marcar todas as as adjacências que estavam como perigo como seguras
-        if (o == None or len(o) == 0):
-            for adj in adjacentes:
-                pos_mem = self.memory[adj.y][adj.x]
-                if (pos_mem.safe == False):
-                    pos_mem.safe = True
-                    pos_mem.content = []
-
-            return
+        
+        if (self.prev_action == "andar" or self.prev_action == "andar_re"):
+            # Se não houver observações, marcar todas as as adjacências que estavam como perigo como seguras
+            if (len(o) == 0 or ("breeze" not in o and "flash" not in o)):
+                for adj in adjacentes:
+                    pos_mem = self.memory[adj.y][adj.x]
+                    if (pos_mem.safe == False):
+                        pos_mem.safe = True
+                        pos_mem.content = []
         
         for s in o:
         
@@ -231,7 +250,7 @@ class GameAI():
                         unsafe.append(adj)
                 if (len(unsafe) == 1):
                     self.memory[unsafe[0].y][unsafe[0].x].content = ["pit"]
-                    around = self.manhattan2(unsafe[0])
+                    around = self.Manhattan2(unsafe[0])
                     for a in around:
                         pos_mem = self.memory[a.y][a.x]
                         if ("pit" in pos_mem.content):
@@ -252,7 +271,7 @@ class GameAI():
                         unsafe.append(adj)
                 if (len(unsafe) == 1):
                     self.memory[unsafe[0].y][unsafe[0].x].content = ["teleport"]
-                    around = self.manhattan2(unsafe[0])
+                    around = self.Manhattan2(unsafe[0])
                     for a in around:
                         pos_mem = self.memory[a.y][a.x]
                         if ("teleport" in pos_mem.content):
@@ -264,7 +283,7 @@ class GameAI():
                             pos_mem.content.append("teleport")
                 pass
 
-            elif s == "blueLight":
+            elif s == "redLight":
                 pos_mem = self.memory[self.player.y][self.player.x]
                 pos_mem.timer = 0
 
@@ -276,9 +295,8 @@ class GameAI():
 
                 pass
 
-            elif s == "redLight":
+            elif s == "blueLight":
                 pos_mem = self.memory[self.player.y][self.player.x]
-                pos_mem.timer = 300
 
                 if "gold" not in pos_mem.content:
                     self.gold.append(pos_mem)
@@ -289,12 +307,14 @@ class GameAI():
                 pass
 
             elif "damage" in s:
+                self.took_damage = True
                 attacker = s[7:]
 
             elif "hit" in s:
                 hit = s[4:]
             
             elif s.find("enemy#") > -1:
+                self.saw_enemy = True
                 try:
                     steps = int(s[6:])
                 except:
@@ -310,19 +330,25 @@ class GameAI():
         # como "apagar/esquecer" as observacoes?
         # devemos apagar as atuais para poder receber novas
         # se nao apagarmos, as novas se misturam com as anteriores
-
-        self.update_clock()
+        self.took_damage = False
+        self.on_gold = False
+        self.on_potion = False
+        self.blocked = False
+        self.saw_enemy = False
 
         pass
     
+    def UpdateTimeLeft(self):
+        self.time_left -= 1
+
+        self.UpdateTileClock()
+
     # Diminui 1 de cada timer > 0 
-    def update_clock(self):
+    def UpdateTileClock(self):
         for pos in self.potion:
-            if (pos.timer > 0):
-                pos.timer -= 1
+            pos.timer -= 1
         for pos in self.gold:
-            if (pos.timer > 0):
-                pos.timer -= 1
+            pos.timer -= 1
 
     # Define a posição da poção mais próxima levando em consideração heurística e timer
     # Retorna None se não conhece poções
@@ -331,15 +357,110 @@ class GameAI():
         closest = None
 
         for mem_pos in self.potion:
-            time = mem_pos.timer
+            time = mem_pos.timer - 5
             disc = Heuristic(self.player, self.dir, mem_pos.position)
             if (disc > time):
                 time = disc
             if (time < min_time):
                 min_time = time
                 closest = mem_pos
+        if (closest == None):
+            return None
+        heuristic = Heuristic(self.player, self.dir, closest.position)
+        return (closest, closest.timer - heuristic) 
+    
+    def closest_gold(self):
+        min_time = 999
+        closest = None
 
-        return closest
+        for mem_pos in self.gold:
+            time = mem_pos.timer - 5
+            disc = Heuristic(self.player, self.dir, mem_pos.position)
+            if (disc > time):
+                time = disc
+            if (time < min_time):
+                min_time = time
+                closest = mem_pos
+        if (closest == None):
+            return None
+        heuristic = Heuristic(self.player, self.dir, closest.position)
+        return (closest, closest.timer - heuristic)  
+
+    # Retorna movimento com base na próxima posição do path traçado, assumindo que é adjacente
+    # Se andar, remove a posição do path
+    def MoveInPath(self):
+        prox_pos = self.path[0]
+        
+        if (prox_pos.x == self.player.x + 1):
+            if (self.dir == "north"):
+                self.prev_action = "virar_direita"
+                return "virar_direita"
+            if (self.dir == "south"):
+                self.prev_action = "virar_esquerda"
+                return "virar_esquerda"
+            if (self.dir == "west"):
+                if (self.player.y < MAX_Y/2):
+                    self.prev_action = "virar_esquerda"
+                    return "virar_esquerda"
+                self.prev_action = "virar_direita"
+                return "virar_direita"
+            self.path.pop(0)
+            self.prev_action = "andar"
+            print("andar")
+            return "andar"
+        if (prox_pos.x == self.player.x - 1):
+            if (self.dir == "north"):
+                self.prev_action = "virar_esquerda"
+                return "virar_esquerda"
+            if (self.dir == "south"):
+                self.prev_action = "virar_direita"
+                return "virar_direita"
+            if (self.dir == "east"):
+                if (self.player.y < MAX_Y/2):
+                    self.prev_action = "virar_direita"
+                    return "virar_direita"
+                self.prev_action = "virar_esquerda"
+                return "virar_esquerda"
+            self.path.pop(0)
+            print("andar2")
+            self.prev_action = "andar"
+            return "andar"
+        if (prox_pos.y == self.player.y - 1):
+            if (self.dir == "west"):
+                self.prev_action = "virar_direita"
+                return "virar_direita"
+            if (self.dir == "east"):
+                self.prev_action = "virar_esquerda"
+                return "virar_esquerda"
+            if (self.dir == "south"):
+                if (self.player.x < MAX_X/2):
+                    self.prev_action = "virar_esquerda"
+                    return "virar_esquerda"
+                self.prev_action = "virar_direita"
+                return "virar_direita"
+            self.path.pop(0)
+            print("andar3")
+            self.prev_action = "andar"
+            return "andar"
+        if (prox_pos.y == self.player.y + 1):
+            if (self.dir == "west"):
+                self.prev_action = "virar_esquerda"
+                return "virar_esquerda"
+            if (self.dir == "east"):
+                self.prev_action = "virar_direita"
+                return "virar_direita"
+            if (self.dir == "north"):
+                if (self.player.x < MAX_X/2):
+                    self.prev_action = "virar_direita"
+                    return "virar_direita"
+                self.prev_action = "virar_esquerda"
+                return "virar_esquerda"
+            self.path.pop(0)
+            print("andar4")
+            self.prev_action = "andar"
+            return "andar"
+        return ""
+
 
     # <summary>
     # Get Decision
@@ -347,6 +468,8 @@ class GameAI():
     # <returns>command string to new decision</returns>
     def GetDecision(self):
 
+        print("GetDecision")
+        
         # IMPLEMENTAR
         # Qual a decisão do seu bot?
 
@@ -358,33 +481,53 @@ class GameAI():
         # 3- chama "GetDecision()" para perguntar o que deve fazer agora
         # 4- envia decisão ao servidor
         # 5- após ação enviada, reinicia voltando ao passo 1
-        
+
+        mem_now = self.memory[self.player.y][self.player.x]
+        mem_now.visited = True
+
+        if ((not self.on_potion) and (not self.on_gold) and (mem_now.timer <= 0)):
+            mem_now.timer += 300
+
         if (self.energy == 0):
             return ""
         
         # Se passar por cima do ouro, sempre pegar
         if (self.on_gold):
+            self.memory[self.player.y][self.player.x].timer = 300
+            if (not self.dodge):
+                self.prev_action = "pegar_ouro"
             self.on_gold = False
-            self.prev_action = "pegar_ouro"
             return "pegar_ouro"
         
-        if (self.on_potion and not self.alone and self.energy < 100):
-            self.on_potion = False
+        # Se passar por cima da poção e não estiver com energia cheia, sempre pegar (a não ser que esteja sozinho pois não tem mais perigo)
+        if (self.on_potion and not self.alone):
             self.memory[self.player.y][self.player.x].timer = 300
-            self.prev_action = "pegar_powerup"
+            if (not self.dodge):
+                self.prev_action = "pegar_powerup"
+            self.on_potion = False
             return "pegar_powerup"
 
-        if (self.energy < 40 and not self.dying):
+        if (not self.dying and self.energy <= 50):
             self.dying = True
-            
+        else:
+            self.dying = False
             
 
         adjacentes = self.GetObservableAdjacentPositions()
         safeAdjs = []
         for adj in adjacentes:
-            if (self.memory[adj.y][adj.x].safe):
+            pos_mem = self.memory[adj.y][adj.x]
+            if (pos_mem.safe):
                 safeAdjs.append(adj)
-
+                add = True
+                for dest in self.dest_pile:
+                    if (dest.x == adj.x and dest.y == adj.y):
+                        add = False
+                        break
+                if (add):
+                    if (not pos_mem.visited and not pos_mem.blocked):
+                        self.dest_pile.append(adj)
+        
         # Se nenhuma adjacência é segura, andar pra frente pois consome menos que virar
         # Se não for possível andar para frente (borda do mapa ou bloqueio), andar para trás
         if(safeAdjs == []):
@@ -404,30 +547,182 @@ class GameAI():
             self.prev_action = "andar_re"
             return "andar_re"
 
-        if (len(safeAdjs) == 1):
-            #IMPLEMENTAR ANDA PRA ELE
-            pass
+        
+        # Se chegou ao destino, remove destino
+        if (self.destination != None):
+            if((self.player.x == self.destination.x and self.player.y == self.destination.y) or self.memory[self.destination.y][self.destination.x].blocked):
+                self.destination = None
 
+        # Se está em dodge, continua até terminar movimento de dodge e desliga flag
+        if (self.dodge):
+            if (self.prev_action == "virar_direita" or self.prev_action == "virar_esquerda"):
+                self.dodge = False
+                self.prev_action = "andar"
+                return "andar"
+            
+            next_pos = Position(self.player.x + 1, self.player.y)
+            for adj in safeAdjs:
+                if (next_pos.x == adj.x and next_pos.y == adj.y):
+                    self.prev_action = "virar_direita"
+                    return "virar_direita"
+            next_pos = Position(self.player.x - 1, self.player.y)
+            for adj in safeAdjs:
+                if (next_pos.x == adj.x and next_pos.y == adj.y):
+                    self.prev_action = "virar_esquerda"
+                    return "virar_esquerda"
+                
+            if (self.prev_action == "andar"):
+                next_pos = self.NextPosition()
+                for adj in safeAdjs:
+                    if (next_pos.x == adj.x and next_pos.y == adj.y):
+                        self.prev_action = "andar"
+                        return "andar"
+                self.prev_action = "andar_re"
+                return "andar_re"
+            if (self.prev_action == "andar_re"):
+                next_pos = self.NextPositionBack()
+                for adj in safeAdjs:
+                    if (next_pos.x == adj.x and next_pos.y == adj.y):
+                        self.prev_action = "andar_re"
+                        return "andar_re"
+                self.prev_action = "andar"
+                return "andar"
 
-        # Exemplo de decisão aleatória:
-        n = random.randint(0,7)
+        closest_potion = self.closest_potion()
 
-        if n == 0:
+        if (self.took_damage):
+            self.took_damage = False
+            # Se está morrendo ou não sabe onde tem poção, começa dodge
+            if (self.dying or closest_potion == None):
+                self.dodge = True
+
+                next_pos = self.NextPosition()
+                for adj in safeAdjs:
+                    if (next_pos.x == adj.x and next_pos.y == adj.y):
+                        self.prev_action = "andar"
+                        return "andar"
+                next_pos = self.NextPositionBack()
+                for adj in safeAdjs:
+                    if (next_pos.x == adj.x and next_pos.y == adj.y):
+                        self.prev_action = "andar_re"
+                        return "andar_re"
+                next_pos = Position(self.player.x + 1, self.player.y)
+                for adj in safeAdjs:
+                    if (next_pos.x == adj.x and next_pos.y == adj.y):
+                        self.prev_action = "virar_direita"
+                        return "virar_direita"
+                self.prev_action = "virar_esquerda"
+                return "virar_esquerda"
+            
+            if (self.saw_enemy and not self.enemy_blocked):
+                self.saw_enemy = False
+                self.prev_action = "atacar"
+                return "atacar"
+            
+            # Procura pra atirar
+            self.prev_action = "virar_direita"
             return "virar_direita"
-        elif n == 1:
-            return "virar_esquerda"
-        elif n == 2:
-            return "andar"
-        elif n == 3:
-            return "atacar"
-        elif n == 4:
-            return "pegar_ouro"
-        elif n == 5:
-            return "pegar_anel"
-        elif n == 6:
-            return "pegar_powerup"
-        elif n == 7:
-            return "andar_re"
+
+        if (self.saw_enemy and not self.enemy_blocked):
+                self.prev_action = "atacar"
+                return "atacar"
+
+        if (closest_potion == None):
+                
+            # Se ainda não conhece poções, procurar (se não já estiver procurando)
+            if (self.destination == None or self.path == []):
+                if (self.dest_pile == []):
+                    adjacentes = self.GetObservableAdjacentPositions()
+                    for adj in adjacentes:
+                        if (self.memory[adj.y][adj.x].visited and not self.memory[adj.y][adj.x].blocked):
+                            self.dest_pile.append(adj)
+                self.dest_pile.sort(key = lambda x : Heuristic(self.player, self.dir, x))
+                self.destination = self.dest_pile.pop(0)
+                self.path = AStar(self.player, self.dir, self.destination, self.memory)
+                return self.MoveInPath()
+            
+            # Se ainda não conhece poções, continua procurando
+            if (self.destination != None):
+                return self.MoveInPath()
+        
+        # JÁ TEM POÇÃO
+        
+        if (self.destination == closest_potion[0].position):
+            return self.MoveInPath()
+
+        # Se ta em cima de um spawn de poção e falta menos de 10 pra acabar, gira e espera
+        if (self.player.x == closest_potion[0].position.x and self.player.y == closest_potion[0].position.y):
+            if closest_potion[0].timer <= 10:
+                self.prev_action = "virar_direita"
+                return "virar_direita"
+
+        if (self.dying):
+            self.destination = closest_potion[0].position
+            self.path = AStar(self.player, self.dir, self.destination, self.memory)
+            return self.MoveInPath()
+
+        closest_gold = self.closest_gold() 
+
+        if (closest_gold != None):
+                 # Se ta em cima de um spawn de ouro e falta menos de 10 pra acabar, gira e espera
+            if (self.player.x == closest_gold[0].position.x and self.player.y == closest_gold[0].position.y):
+                if closest_gold[0].timer <= 10:
+                    self.prev_action = "virar_direita"
+                    return "virar_direita"
+                
+            if (self.destination == closest_gold[0].position):
+                return self.MoveInPath()
+            
+            if (closest_gold[1] < closest_potion[1]):
+                if (closest_gold[1] < 5):
+                    self.destination = closest_gold[0].position
+                    self.path = AStar(self.player, self.dir, self.destination, self.memory)
+                    return self.MoveInPath()
+            if (closest_potion[1] < 5):
+                    self.destination = closest_potion[0].position
+                    self.path = AStar(self.player, self.dir, self.destination, self.memory)
+                    return self.MoveInPath()
+                
+        if (self.prev_action == "andar" or self.prev_action == "andar_re"):
+            if (self.player.x < MAX_X/2):
+                sideR = 1
+            else:
+                sideR = 0
+            if (self.player.y < MAX_Y/2):
+                sideD = 1
+            else:
+                sideD = 0
+            match (self.dir):
+                case "north":
+                    if (sideR == 1):
+                        self.prev_action = "virar_direita"
+                        return "virar_direita"
+                    self.prev_action = "virar_esquerda"
+                    return "virar_esquerda"
+                case "east":
+                    if (sideD == 1):
+                        self.prev_action = "virar_direita"
+                        return "virar_direita"
+                    self.prev_action = "virar_esquerda"
+                    return "virar_esquerda"
+                case "south":
+                    if (sideR == 1):
+                        self.prev_action = "virar_esquerda"
+                        return "virar_esquerda"
+                    self.prev_action = "virar_direita"
+                    return "virar_direita"
+                case "west":
+                    if (sideD == 1):
+                        self.prev_action = "virar_esquerda"
+                        return "virar_esquerda"
+                    self.prev_action = "virar_direita"
+                    return "virar_direita"
+            if (self.prev_action == "virar_direita" or self.prev_action == "virar_esquerda"):
+                prox_pos = self.NextPosition()
+                if (self.memory[prox_pos.y][prox_pos.x].safe):
+                    self.prev_action = "andar"
+                    return "andar"
+                return self.prev_action
 
         return ""
 
@@ -451,7 +746,7 @@ class MemoryPosition():
         self.visited = False
         self.safe = False
         self.blocked = False
-        self.timer = -1
+        self.timer = 300
 
 class AStarCoord():
     def __init__(self, position, dir, destination, stepped, father):
@@ -459,47 +754,49 @@ class AStarCoord():
         self.dir = dir
         self.destination = destination
         self.stepped = stepped
-        self.heuristic = Heuristic(position, destination)
+        self.heuristic = Heuristic(position, dir, destination)
         self.adjust = self.heuristic - abs(destination.x - position.x) + abs(destination.y - position.y)
         self.father = father
         self.children = []
 
-def CheckNeigbours(father, can_visit, visited):
-    CheckNeigbour(father, can_visit, visited, father.x + 1, father.y)
-    CheckNeigbour(father, can_visit, visited, father.x - 1, father.y)
-    CheckNeigbour(father, can_visit, visited, father.x, father.y + 1)
-    CheckNeigbour(father, can_visit, visited, father.x, father.y - 1)
+def CheckNeighbours(father, memory, visited):
+    CheckNeighbour(father, memory, visited, father.position.x + 1, father.position.y, "east")
+    CheckNeighbour(father, memory, visited, father.position.x - 1, father.position.y, "west")
+    CheckNeighbour(father, memory, visited, father.position.x, father.position.y + 1, "south")
+    CheckNeighbour(father, memory, visited, father.position.x, father.position.y - 1, "north")
 
 # Função que avalia se um vizinho já foi percorido e se é válido antes de adicioná-lo como filho de uma outra célula
-def CheckNeigbour(father, can_visit, visited, x, y):
-    if ((x, y) in can_visit and (x, y) not in visited):
-        father.children.append(AStarCoord(x, y, father.destination, father.stepped + father.adjust+ 1, father))
+def CheckNeighbour(father, memory, visited, x, y, dir):
+    if (x < 0 or x >= MAX_X or y < 0 or y >= MAX_Y):
+        return
+    if ((memory[y][x].visited or (father.destination.x, father.destination.y) == (x, y)) and (x, y) not in visited):
+        father.children.append(AStarCoord(Position(x, y), dir, father.destination, father.stepped + father.adjust + 1, father))
         visited.append((x, y))
 
 def Heuristic(position, dir, destination):
     if (dir == "north"):
-        if (position.x == destination.x and position.y > destination.y):
+        if (position.x == destination.x and position.y >= destination.y):
             adjust = 0
         elif (position.y >= destination.y):
             adjust = 1
         else:
             adjust = 2
     elif (dir == "east"):
-        if (position.x < destination.x and position.y == destination.y):
+        if (position.x <= destination.x and position.y == destination.y):
             adjust = 0
         elif (position.x <= destination.x):
             adjust = 1
         else:
             adjust = 2
     elif (dir == "south"):
-        if (position.x == destination.x and position.y < destination.y):
+        if (position.x == destination.x and position.y <= destination.y):
             adjust = 0
         elif (position.y <= destination.y):
             adjust = 1
         else:
             adjust = 2
     elif (dir == "west"):
-        if (position.x > destination.x and position.y == destination.y):
+        if (position.x >= destination.x and position.y == destination.y):
             adjust = 0
         elif (position.x >= destination.x):
             adjust = 1
@@ -511,29 +808,32 @@ def Heuristic(position, dir, destination):
     return abs(destination.x - position.x) + abs(destination.y - position.y) + adjust
 
 def FindPath(coord):
-    path = [(coord.position.x, coord.position.y)]
+    path = [Position(coord.position.x, coord.position.y)]
 
     while (coord.father != None):
         coord = coord.father
-        path.insert(0, (coord.position.x, coord.position.y))
+        if (coord.father == None):
+            break
+        path.insert(0, Position(coord.position.x, coord.position.y))
 
     return path
 
-def AStar(position, dir, can_visit, destination):
+def AStar(position, dir, destination, memory):
     visited = [(position.x, position.y)]
     
     a_star_heap = [AStarCoord(position, dir, destination, 0, None)]
 
     while (True):
+        
         current_coord = a_star_heap.pop(0)
-
+        
         if (current_coord.heuristic == 0):
             path = FindPath(current_coord)
 
             return path
 
-        CheckNeigbours(current_coord, can_visit, visited)
-
+        CheckNeighbours(current_coord, memory, visited)
+        
         a_star_heap.extend(current_coord.children)
-
+        
         a_star_heap.sort(key = lambda x : x.stepped + x.heuristic)
