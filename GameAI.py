@@ -54,6 +54,7 @@ class GameAI():
     took_damage = False # If took damage
     enemy_blocked = False
     blocked = False # If was blocked on the last move
+    obs = False
     
     on_gold = False # If is on gold
     on_potion = False # If is on potion
@@ -193,7 +194,8 @@ class GameAI():
     # </summary>
     # <param name="o">list of observations</param>
     def GetObservations(self, o):
-    
+        
+        self.obs = True
         # IMPLEMENTAR
         # como sua solucao vai tratar as observacoes?
         # como seu bot vai memorizar os lugares por onde passou?
@@ -467,6 +469,9 @@ class GameAI():
     # <returns>command string to new decision</returns>
     def GetDecision(self):
         
+        if (not self.obs):
+            return ""
+        self.obs = False
         # IMPLEMENTAR
         # Qual a decisão do seu bot?
 
@@ -479,8 +484,7 @@ class GameAI():
         # 4- envia decisão ao servidor
         # 5- após ação enviada, reinicia voltando ao passo 1
 
-        mem_now = self.memory[self.player.y][self.player.x]
-        mem_now.visited = True
+        self.memory[self.player.y][self.player.x].visited = True
 
         # Se chegou ao destino, remove destino
         if (self.destination != None):
@@ -667,8 +671,6 @@ class GameAI():
                     self.prev_action = "virar_direita"
                     return "virar_direita"
                 
-            if (self.destination == closest_gold[0].position):
-                return self.MoveInPath()
             
             if (closest_gold[1] < closest_potion[1]):
                 if (closest_gold[1] < 5):
@@ -738,7 +740,6 @@ class GameAI():
         self.destination = self.dest_pile.pop(0)
         self.path = AStar(self.player, self.dir, self.destination, self.memory)
         return self.MoveInPath()
-        return ""
 
 def InstantiateMemory():
     listay = []
