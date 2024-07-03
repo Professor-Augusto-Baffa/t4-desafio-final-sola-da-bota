@@ -212,8 +212,7 @@ class GameAI():
                     if (pos_mem.safe == False):
                         pos_mem.safe = True
                         pos_mem.content = []
-        if (o != []):
-            print(o)
+
         for s in o:
         
             if s == "blocked":
@@ -238,11 +237,9 @@ class GameAI():
                             self.memory[self.player.y][self.player.x - 1].blocked = True
                         elif (self.prev_action == "andar_re"):
                             self.memory[self.player.y][self.player.x + 1].blocked = True
-                print("BLOCKED")
                 pass
 
             elif s == "steps":
-                print("STEPS")
                 pass
             
             elif s == "breeze":
@@ -263,7 +260,6 @@ class GameAI():
                         pos_mem = self.memory[adj.y][adj.x]
                         if ("pit" not in pos_mem.content):
                             pos_mem.content.append("pit")
-                print("BREEZE")
                 pass
 
             elif s == "flash":
@@ -284,7 +280,6 @@ class GameAI():
                         pos_mem = self.memory[adj.y][adj.x]
                         if ("teleport" not in pos_mem.content):
                             pos_mem.content.append("teleport")
-                print("FLASH")
                 pass
 
             elif s == "redLight":
@@ -296,7 +291,6 @@ class GameAI():
                     pos_mem.content = ["potion"]
 
                 self.on_potion = True
-                print("REDLIGHT")
                 pass
 
             elif s == "blueLight":
@@ -308,7 +302,6 @@ class GameAI():
                     pos_mem.content = ["gold"]
                 
                 self.on_gold = True
-                print("BLUELIGHT")
                 pass
 
             elif "damage" in s:
@@ -464,7 +457,6 @@ class GameAI():
                 self.path.pop(0)
                 self.prev_action = "andar"
                 return "andar"
-        print("UNSAFE " + str(prox_pos.x) + " " + str(prox_pos.y) + " " + str(self.destination.x) + " " + str(self.destination.y))
         self.destination = None
         return ""
 
@@ -512,10 +504,6 @@ class GameAI():
                 if (add):
                     if (not pos_mem.visited and not pos_mem.blocked):
                         self.dest_pile.append(adj)
-        print("DEST PILE")
-        for adj in self.dest_pile:
-            print(adj.x, adj.y)
-        print("---")
         
         # Se passar por cima do ouro, sempre pegar
         mem_now = self.memory[self.player.y][self.player.x]
@@ -639,7 +627,6 @@ class GameAI():
                 return "atacar"
 
         if (closest_potion == None):
-            print("Procurando poção")
             # Se ainda não conhece poções, procurar (se não já estiver procurando)
             if (self.destination == None or self.path == []):
                 if (self.dest_pile == []):
@@ -663,7 +650,6 @@ class GameAI():
 
         # Se ta em cima de um spawn de poção e falta menos de 10 pra acabar, gira e espera
         if (self.player.x == closest_potion[0].position.x and self.player.y == closest_potion[0].position.y):
-            print("Esperando poção")
             if closest_potion[0].timer <= 10:
                 self.prev_action = "virar_direita"
                 return "virar_direita"
@@ -678,7 +664,6 @@ class GameAI():
         if (closest_gold != None):
             # Se ta em cima de um spawn de ouro e falta menos de 10 pra acabar, gira e espera
             if (self.player.x == closest_gold[0].position.x and self.player.y == closest_gold[0].position.y):
-                print("Esperando ouro")
                 if closest_gold[0].timer <= 10:
                     self.prev_action = "virar_direita"
                     return "virar_direita"
@@ -848,7 +833,6 @@ def FindPath(coord):
     return path
 
 def AStar(position, dir, destination, memory):
-    print("AESTRELA" + str(destination.x) + str(destination.y))
     visited = [(position.x, position.y)]
     
     a_star_heap = [AStarCoord(position, dir, destination, 0, None)]
