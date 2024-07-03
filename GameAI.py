@@ -646,7 +646,9 @@ class GameAI():
         # JÁ TEM POÇÃO
         
         if (self.destination == closest_potion[0].position):
-            return self.MoveInPath()
+            if (not(self.destination.x == self.player.x and self.destination.y == self.player.y)):
+                return self.MoveInPath()
+            self.destination = None
 
         # Se ta em cima de um spawn de poção e falta menos de 10 pra acabar, gira e espera
         if (self.player.x == closest_potion[0].position.x and self.player.y == closest_potion[0].position.y):
@@ -669,22 +671,32 @@ class GameAI():
                     return "virar_direita"
                 
             if (self.destination == closest_gold[0].position):
-                return self.MoveInPath()
+                if (not(self.destination.x == self.player.x and self.destination.y == self.player.y)):
+                    return self.MoveInPath()
+                self.destination = None
             
             if (closest_gold[1] < closest_potion[1]):
                 if (closest_gold[1] < 5):
-                    self.destination = closest_gold[0].position
-                    self.path = AStar(self.player, self.dir, self.destination, self.memory)
-                    return self.MoveInPath()
+                    if (not(self.player.x == closest_gold[0].position.x and self.player.y == closest_gold[0].position.y)):
+                        self.destination = closest_gold[0].position
+                        self.path = AStar(self.player, self.dir, self.destination, self.memory)
+                        return self.MoveInPath()
+                    self.prev_action = "virar_direita"
+                    return "virar_direita"
             if (closest_potion[1] < 5):
+                    if (not(self.player.x == closest_potion[0].position.x and self.player.y == closest_potion[0].position.y)):
+                        self.destination = closest_potion[0].position
+                        self.path = AStar(self.player, self.dir, self.destination, self.memory)
+                        return self.MoveInPath()
+                    self.prev_action = "virar_direita"
+        else:
+            if (closest_potion[1] < 5):
+                if (not(self.player.x == closest_potion[0].position.x and self.player.y == closest_potion[0].position.y)):
                     self.destination = closest_potion[0].position
                     self.path = AStar(self.player, self.dir, self.destination, self.memory)
                     return self.MoveInPath()
-        else:
-            if (closest_potion[1] < 5):
-                self.destination = closest_potion[0].position
-                self.path = AStar(self.player, self.dir, self.destination, self.memory)
-                return self.MoveInPath()
+                self.prev_action = "virar_direita"
+                return "virar_direita"
             
         flag = random.randint(0, 2)
         if (self.prev_action == "virar_direita" or self.prev_action == "virar_esquerda" or flag == 0):
