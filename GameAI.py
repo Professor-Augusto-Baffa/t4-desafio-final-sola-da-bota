@@ -212,7 +212,8 @@ class GameAI():
                     if (pos_mem.safe == False):
                         pos_mem.safe = True
                         pos_mem.content = []
-        
+        if (o != []):
+            print(o)
         for s in o:
         
             if s == "blocked":
@@ -237,9 +238,11 @@ class GameAI():
                             self.memory[self.player.y][self.player.x - 1].blocked = True
                         elif (self.prev_action == "andar_re"):
                             self.memory[self.player.y][self.player.x + 1].blocked = True
+                print("BLOCKED")
                 pass
 
             elif s == "steps":
+                print("STEPS")
                 pass
             
             elif s == "breeze":
@@ -260,7 +263,7 @@ class GameAI():
                         pos_mem = self.memory[adj.y][adj.x]
                         if ("pit" not in pos_mem.content):
                             pos_mem.content.append("pit")
-
+                print("BREEZE")
                 pass
 
             elif s == "flash":
@@ -281,6 +284,7 @@ class GameAI():
                         pos_mem = self.memory[adj.y][adj.x]
                         if ("teleport" not in pos_mem.content):
                             pos_mem.content.append("teleport")
+                print("FLASH")
                 pass
 
             elif s == "redLight":
@@ -292,18 +296,19 @@ class GameAI():
                     pos_mem.content = ["potion"]
 
                 self.on_potion = True
-
+                print("REDLIGHT")
                 pass
 
             elif s == "blueLight":
                 pos_mem = self.memory[self.player.y][self.player.x]
+                pos_mem.timer = 0
 
                 if "gold" not in pos_mem.content:
                     self.gold.append(pos_mem)
                     pos_mem.content = ["gold"]
                 
                 self.on_gold = True
-
+                print("BLUELIGHT")
                 pass
 
             elif "damage" in s:
@@ -459,7 +464,7 @@ class GameAI():
                 self.path.pop(0)
                 self.prev_action = "andar"
                 return "andar"
-        print("UNSAFE")
+        print("UNSAFE " + str(prox_pos.x) + " " + str(prox_pos.y) + " " + str(self.destination.x) + " " + str(self.destination.y))
         self.destination = None
         return ""
 
@@ -490,9 +495,6 @@ class GameAI():
             if((self.player.x == self.destination.x and self.player.y == self.destination.y) or self.memory[self.destination.y][self.destination.x].blocked):
                 self.destination = None
 
-        if ((not self.on_potion) and (not self.on_gold) and (mem_now.timer <= 0)):
-            mem_now.timer += 150
-
         if (self.energy == 0):
             return ""
         
@@ -510,18 +512,23 @@ class GameAI():
                 if (add):
                     if (not pos_mem.visited and not pos_mem.blocked):
                         self.dest_pile.append(adj)
+        print("DEST PILE")
+        for adj in self.dest_pile:
+            print(adj.x, adj.y)
+        print("---")
         
         # Se passar por cima do ouro, sempre pegar
-        if (self.on_gold):
-            self.memory[self.player.y][self.player.x].timer = 150
+        mem_now = self.memory[self.player.y][self.player.x]
+        if (mem_now.content == ["gold"] and mem_now.timer <= 0):
+            mem_now.timer += 150
             if (not self.dodge):
                 self.prev_action = "pegar_ouro"
             self.on_gold = False
             return "pegar_ouro"
         
         # Se passar por cima da poção e não estiver com energia cheia, sempre pegar (a não ser que esteja sozinho pois não tem mais perigo)
-        if (self.on_potion and not self.alone):
-            self.memory[self.player.y][self.player.x].timer = 150
+        if (mem_now.content == ["potion"] and mem_now.timer <= 0 and not self.alone):
+            mem_now.timer += 150
             if (not self.dodge):
                 self.prev_action = "pegar_powerup"
             self.on_potion = False
@@ -594,6 +601,10 @@ class GameAI():
             self.took_damage = False
             # Se está morrendo ou não sabe onde tem poção, começa dodge
             if (self.dying or closest_potion == None):
+                self.dest_pile.append(self.destination)
+                self.destination = None
+                self.path = []
+
                 self.dodge = True
 
                 next_pos = self.NextPosition()
@@ -682,7 +693,6 @@ class GameAI():
                     return self.MoveInPath()
             if (closest_potion[1] < 5):
                     self.destination = closest_potion[0].position
-                    print(self.destination.x, self.destination.y)
                     self.path = AStar(self.player, self.dir, self.destination, self.memory)
                     return self.MoveInPath()
         else:
@@ -838,7 +848,7 @@ def FindPath(coord):
     return path
 
 def AStar(position, dir, destination, memory):
-    print(destination.x, destination.y)
+    print("AESTRELA" + str(destination.x) + str(destination.y))
     visited = [(position.x, position.y)]
     
     a_star_heap = [AStarCoord(position, dir, destination, 0, None)]
