@@ -34,7 +34,7 @@ class Bot():
     #Descomente para escolher uma cor
     botcolor = (0,255,255)  # BOT COLOR
     name = "vambot" # BOT NAME
-    host = "atari.icad.puc-rio.br" # SERVER
+    host = "192.168.0.101" # SERVER
 
     client = None
     gameAi = None
