@@ -33,7 +33,7 @@ class Bot():
 
     #Descomente para escolher uma cor
     botcolor = (0,255,0)  # BOT COLOR
-    name = "expedito" # BOT NAME
+    name = "vambot" # BOT NAME
     host = "atari.icad.puc-rio.br" # SERVER
 
     client = None
