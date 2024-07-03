@@ -32,8 +32,8 @@ import datetime
 class Bot():
 
     #Descomente para escolher uma cor
-    botcolor = (0,255,255)  # BOT COLOR
-    name = "BOTe" # BOT NAME
+    botcolor = (0,255,0)  # BOT COLOR
+    name = "expedito" # BOT NAME
     host = "atari.icad.puc-rio.br" # SERVER
 
     client = None
@@ -298,6 +298,7 @@ class Bot():
     def DoDecision(self):
 
         decision = self.gameAi.GetDecision()
+        
         if decision == "virar_direita":
             self.client.sendTurnRight()
         elif decision == "virar_esquerda":
