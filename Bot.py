@@ -32,7 +32,7 @@ import datetime
 class Bot():
 
     #Descomente para escolher uma cor
-    botcolor = (0,255,0)  # BOT COLOR
+    botcolor = (0,255,255)  # BOT COLOR
     name = "vambot" # BOT NAME
     host = "atari.icad.puc-rio.br" # SERVER
 
