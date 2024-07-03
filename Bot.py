@@ -41,7 +41,7 @@ class Bot():
     timer1 = None
     
     running = True
-    thread_interval = 0.1 # USE BETWEEN 0.1 and 1 (0.1 real setting, 1 debug settings and makes the bot slower)
+    thread_interval = 0.2 # USE BETWEEN 0.1 and 1 (0.1 real setting, 1 debug settings and makes the bot slower)
 
     playerList = {} #new Dictionary<long, PlayerInfo>
     shotList = [] #new List<ShotInfo>

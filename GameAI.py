@@ -46,6 +46,7 @@ class GameAI():
     gold = []
     potion = []
     dest_pile = []
+    cont_tiro = 0
 
     dying = False # If energy < 40
     dodge = False # If is trying to dodge bullets
@@ -346,9 +347,9 @@ class GameAI():
     # Diminui 1 de cada timer > 0 
     def UpdateTileClock(self):
         for pos in self.potion:
-            pos.timer -= 1
+            pos.timer -= 2
         for pos in self.gold:
-            pos.timer -= 1
+            pos.timer -= 2
 
     # Define a posição da poção mais próxima levando em consideração heurística e timer
     # Retorna None se não conhece poções
@@ -472,6 +473,18 @@ class GameAI():
         if (not self.obs):
             return ""
         self.obs = False
+
+        if (self.prev_action == "atacar"):
+            self.cont_tiro += 1
+        else:
+            self.cont_tiro = 0
+        if (self.cont_tiro == 4):
+            self.saw_enemy = False
+            next = self.NextPosition()
+            if (self.memory[next.y][next.x].safe):
+                return "andar"
+            else:
+                return "virar_direita"
         # IMPLEMENTAR
         # Qual a decisão do seu bot?
 
@@ -501,10 +514,13 @@ class GameAI():
             if (pos_mem.safe):
                 safeAdjs.append(adj)
                 add = True
-                for dest in self.dest_pile:
-                    if (dest.x == adj.x and dest.y == adj.y):
-                        add = False
-                        break
+                if (None not in self.dest_pile):
+                    for dest in self.dest_pile:
+                        if (dest.x == adj.x and dest.y == adj.y):
+                            add = False
+                            break
+                else:
+                    self.dest_pile.remove(None)
                 if (add):
                     if (not pos_mem.visited and not pos_mem.blocked):
                         self.dest_pile.append(adj)
@@ -526,7 +542,7 @@ class GameAI():
             self.on_potion = False
             return "pegar_powerup"
 
-        if (not self.dying and self.energy <= 50):
+        if (not self.dying and self.energy <= 70):
             self.dying = True
         else:
             self.dying = False
@@ -600,6 +616,17 @@ class GameAI():
                 self.dodge = True
 
                 next_pos = self.NextPosition()
+
+                if(self.saw_enemy):
+                    self.saw_enemy = False
+                    for adj in safeAdjs:
+                        if (next_pos.x == adj.x and next_pos.y == adj.y):
+                            self.prev_action = "virar_direita"
+                            return "virar_direita"
+                    self.prev_action = "virar_esquerda"
+                    return "virar_esquerda"
+
+                next_pos = self.NextPosition()
                 for adj in safeAdjs:
                     if (next_pos.x == adj.x and next_pos.y == adj.y):
                         self.prev_action = "andar"
@@ -647,9 +674,6 @@ class GameAI():
                 return self.MoveInPath()
         
         # JÁ TEM POÇÃO
-        
-        if (self.destination == closest_potion[0].position):
-            return self.MoveInPath()
 
         # Se ta em cima de um spawn de poção e falta menos de 10 pra acabar, gira e espera
         if (self.player.x == closest_potion[0].position.x and self.player.y == closest_potion[0].position.y):
@@ -658,9 +682,13 @@ class GameAI():
                 return "virar_direita"
 
         if (self.dying):
-            self.destination = closest_potion[0].position
-            self.path = AStar(self.player, self.dir, self.destination, self.memory)
-            return self.MoveInPath()
+            try:
+                if (closest_potion[0] != None):
+                    self.destination = closest_potion[0].position
+                    self.path = AStar(self.player, self.dir, self.destination, self.memory)
+                    return self.MoveInPath()
+            except:
+                pass
 
         closest_gold = self.closest_gold() 
 
@@ -674,18 +702,22 @@ class GameAI():
             
             if (closest_gold[1] < closest_potion[1]):
                 if (closest_gold[1] < 5):
-                    self.destination = closest_gold[0].position
-                    self.path = AStar(self.player, self.dir, self.destination, self.memory)
-                    return self.MoveInPath()
+                    try:
+                        if (closest_gold[0] != None):
+                            self.destination = closest_gold[0].position
+                            self.path = AStar(self.player, self.dir, self.destination, self.memory)
+                            return self.MoveInPath()
+                    except:
+                        pass
             if (closest_potion[1] < 5):
-                    self.destination = closest_potion[0].position
-                    self.path = AStar(self.player, self.dir, self.destination, self.memory)
-                    return self.MoveInPath()
-        else:
-            if (closest_potion[1] < 5):
-                self.destination = closest_potion[0].position
-                self.path = AStar(self.player, self.dir, self.destination, self.memory)
-                return self.MoveInPath()
+                try:
+                    if (closest_potion[0] != None):
+                        self.destination = closest_potion[0].position
+                        self.path = AStar(self.player, self.dir, self.destination, self.memory)
+                        return self.MoveInPath()
+                except:
+                    pass
+
             
         flag = random.randint(0, 2)
         if (self.prev_action == "virar_direita" or self.prev_action == "virar_esquerda" or flag == 0):
