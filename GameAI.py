@@ -625,122 +625,120 @@ class GameAI():
         if (self.saw_enemy and not self.enemy_blocked):
                 self.prev_action = "atacar"
                 return "atacar"
-        try:
-            if (closest_potion == None):
-                # Se ainda não conhece poções, procurar (se não já estiver procurando)
-                if (self.destination == None or self.path == []):
-                    if (self.dest_pile == []):
-                        adjacentes = self.GetObservableAdjacentPositions()
-                        for adj in adjacentes:
-                            if (self.memory[adj.y][adj.x].visited and not self.memory[adj.y][adj.x].blocked):
-                                self.dest_pile.append(adj)
-                    self.dest_pile.sort(key = lambda x : Heuristic(self.player, self.dir, x))
-                    self.destination = self.dest_pile.pop(0)
-                    self.path = AStar(self.player, self.dir, self.destination, self.memory)
-                    return self.MoveInPath()
-                
-                # Se ainda não conhece poções, continua procurando
-                if (self.destination != None):
-                    return self.MoveInPath()
-            
-            # JÁ TEM POÇÃO
-            
-            if (self.destination == closest_potion[0].position):
-                return self.MoveInPath()
-
-            # Se ta em cima de um spawn de poção e falta menos de 10 pra acabar, gira e espera
-            if (self.player.x == closest_potion[0].position.x and self.player.y == closest_potion[0].position.y):
-                if closest_potion[0].timer <= 10:
-                    self.prev_action = "virar_direita"
-                    return "virar_direita"
-
-            if (self.dying):
-                self.destination = closest_potion[0].position
+        if (closest_potion == None):
+            # Se ainda não conhece poções, procurar (se não já estiver procurando)
+            if (self.destination == None or self.path == []):
+                if (self.dest_pile == []):
+                    adjacentes = self.GetObservableAdjacentPositions()
+                    for adj in adjacentes:
+                        if (self.memory[adj.y][adj.x].visited and not self.memory[adj.y][adj.x].blocked):
+                            self.dest_pile.append(adj)
+                self.dest_pile.sort(key = lambda x : Heuristic(self.player, self.dir, x))
+                self.destination = self.dest_pile.pop(0)
                 self.path = AStar(self.player, self.dir, self.destination, self.memory)
                 return self.MoveInPath()
+            
+            # Se ainda não conhece poções, continua procurando
+            if (self.destination != None):
+                return self.MoveInPath()
+        
+        # JÁ TEM POÇÃO
+        
+        if (self.destination == closest_potion[0].position):
+            return self.MoveInPath()
 
-            closest_gold = self.closest_gold() 
+        # Se ta em cima de um spawn de poção e falta menos de 10 pra acabar, gira e espera
+        if (self.player.x == closest_potion[0].position.x and self.player.y == closest_potion[0].position.y):
+            if closest_potion[0].timer <= 10:
+                self.prev_action = "virar_direita"
+                return "virar_direita"
 
-            if (closest_gold != None):
-                # Se ta em cima de um spawn de ouro e falta menos de 10 pra acabar, gira e espera
-                if (self.player.x == closest_gold[0].position.x and self.player.y == closest_gold[0].position.y):
-                    if closest_gold[0].timer <= 10:
-                        self.prev_action = "virar_direita"
-                        return "virar_direita"
-                    
-                if (self.destination == closest_gold[0].position):
-                    return self.MoveInPath()
+        if (self.dying):
+            self.destination = closest_potion[0].position
+            self.path = AStar(self.player, self.dir, self.destination, self.memory)
+            return self.MoveInPath()
+
+        closest_gold = self.closest_gold() 
+
+        if (closest_gold != None):
+            # Se ta em cima de um spawn de ouro e falta menos de 10 pra acabar, gira e espera
+            if (self.player.x == closest_gold[0].position.x and self.player.y == closest_gold[0].position.y):
+                if closest_gold[0].timer <= 10:
+                    self.prev_action = "virar_direita"
+                    return "virar_direita"
                 
-                if (closest_gold[1] < closest_potion[1]):
-                    if (closest_gold[1] < 5):
-                        self.destination = closest_gold[0].position
-                        self.path = AStar(self.player, self.dir, self.destination, self.memory)
-                        return self.MoveInPath()
-                if (closest_potion[1] < 5):
-                        self.destination = closest_potion[0].position
-                        self.path = AStar(self.player, self.dir, self.destination, self.memory)
-                        return self.MoveInPath()
-            else:
-                if (closest_potion[1] < 5):
+            if (self.destination == closest_gold[0].position):
+                return self.MoveInPath()
+            
+            if (closest_gold[1] < closest_potion[1]):
+                if (closest_gold[1] < 5):
+                    self.destination = closest_gold[0].position
+                    self.path = AStar(self.player, self.dir, self.destination, self.memory)
+                    return self.MoveInPath()
+            if (closest_potion[1] < 5):
                     self.destination = closest_potion[0].position
                     self.path = AStar(self.player, self.dir, self.destination, self.memory)
                     return self.MoveInPath()
-                
-            flag = random.randint(0, 2)
-            if (self.prev_action == "virar_direita" or self.prev_action == "virar_esquerda" or flag == 0):
-                    prox_pos = self.NextPosition()
-                    if (prox_pos.x < MAX_X and prox_pos.y < MAX_Y and prox_pos.x >= 0 and prox_pos.y >= 0):
-                        if (self.memory[prox_pos.y][prox_pos.x].safe):
-                            self.prev_action = "andar"
-                            return "andar"
+        else:
+            if (closest_potion[1] < 5):
+                self.destination = closest_potion[0].position
+                self.path = AStar(self.player, self.dir, self.destination, self.memory)
+                return self.MoveInPath()
+            
+        flag = random.randint(0, 2)
+        if (self.prev_action == "virar_direita" or self.prev_action == "virar_esquerda" or flag == 0):
+                prox_pos = self.NextPosition()
+                if (prox_pos.x < MAX_X and prox_pos.y < MAX_Y and prox_pos.x >= 0 and prox_pos.y >= 0):
+                    if (self.memory[prox_pos.y][prox_pos.x].safe):
+                        self.prev_action = "andar"
+                        return "andar"
+                self.prev_action = "virar_direita"
+                return "virar_direita"
+        if (len(self.gold) >= 2 and flag == 1):
+            if (self.player.x < MAX_X/2):
+                sideR = 1
+            else:
+                sideR = 0
+            if (self.player.y < MAX_Y/2):
+                sideD = 1
+            else:
+                sideD = 0
+            match (self.dir):
+                case "north":
+                    if (sideR == 1):
+                        self.prev_action = "virar_direita"
+                        return "virar_direita"
+                    self.prev_action = "virar_esquerda"
+                    return "virar_esquerda"
+                case "east":
+                    if (sideD == 1):
+                        self.prev_action = "virar_direita"
+                        return "virar_direita"
+                    self.prev_action = "virar_esquerda"
+                    return "virar_esquerda"
+                case "south":
+                    if (sideR == 1):
+                        self.prev_action = "virar_esquerda"
+                        return "virar_esquerda"
                     self.prev_action = "virar_direita"
                     return "virar_direita"
-            if (len(self.gold) >= 2 and flag == 1):
-                if (self.player.x < MAX_X/2):
-                    sideR = 1
-                else:
-                    sideR = 0
-                if (self.player.y < MAX_Y/2):
-                    sideD = 1
-                else:
-                    sideD = 0
-                match (self.dir):
-                    case "north":
-                        if (sideR == 1):
-                            self.prev_action = "virar_direita"
-                            return "virar_direita"
+                case "west":
+                    if (sideD == 1):
                         self.prev_action = "virar_esquerda"
                         return "virar_esquerda"
-                    case "east":
-                        if (sideD == 1):
-                            self.prev_action = "virar_direita"
-                            return "virar_direita"
-                        self.prev_action = "virar_esquerda"
-                        return "virar_esquerda"
-                    case "south":
-                        if (sideR == 1):
-                            self.prev_action = "virar_esquerda"
-                            return "virar_esquerda"
-                        self.prev_action = "virar_direita"
-                        return "virar_direita"
-                    case "west":
-                        if (sideD == 1):
-                            self.prev_action = "virar_esquerda"
-                            return "virar_esquerda"
-                        self.prev_action = "virar_direita"
-                        return "virar_direita"
-                    
-            if (self.dest_pile == []):
-                adjacentes = self.GetObservableAdjacentPositions()
-                for adj in adjacentes:
-                    if (self.memory[adj.y][adj.x].visited and not self.memory[adj.y][adj.x].blocked):
-                        self.dest_pile.append(adj)
-            self.dest_pile.sort(key = lambda x : Heuristic(self.player, self.dir, x))
-            self.destination = self.dest_pile.pop(0)
-            self.path = AStar(self.player, self.dir, self.destination, self.memory)
-            return self.MoveInPath()
-        except:
-            return ""
+                    self.prev_action = "virar_direita"
+                    return "virar_direita"
+                
+        if (self.dest_pile == []):
+            adjacentes = self.GetObservableAdjacentPositions()
+            for adj in adjacentes:
+                if (self.memory[adj.y][adj.x].visited and not self.memory[adj.y][adj.x].blocked):
+                    self.dest_pile.append(adj)
+        self.dest_pile.sort(key = lambda x : Heuristic(self.player, self.dir, x))
+        self.destination = self.dest_pile.pop(0)
+        self.path = AStar(self.player, self.dir, self.destination, self.memory)
+        return self.MoveInPath()
+        return ""
 
 def InstantiateMemory():
     listay = []
